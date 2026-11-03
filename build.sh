@@ -129,6 +129,15 @@ rm -rf out
 mkdir -p out
 cp -L node-${version}-openharmony-arm64/lib/libnode.so out/libnode.so
 cp -rL node-${version}-openharmony-arm64/include out/include
+# Ship the libc++ runtime that libnode.so was actually linked against, so the
+# app never mixes it with a different SDK's copy.
+LIBCXX=$(find llvm-19 -name libc++_shared.so 2>/dev/null | head -1)
+if [ -n "$LIBCXX" ]; then
+  cp -L "$LIBCXX" out/libc++_shared.so
+  echo "bundled $LIBCXX"
+else
+  echo "WARN: libc++_shared.so not found in toolchain"
+fi
 tar -czf libnode-ohos-arm64.tar.gz -C out .
 echo "=== slim artifact ==="
 ls -lh libnode-ohos-arm64.tar.gz

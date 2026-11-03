@@ -75,10 +75,20 @@ if echo " $need_no_error_versions " | grep -q " $version "; then
     export CXX="$CXX -Wno-error=implicit-function-declaration"
 fi
 
+# Compile budget: the free GitHub runner has only 4 cores and a hard job
+# timeout, and --shared forces -fPIC across all of V8/ICU. Trim everything
+# that is not needed to embed Node as a library:
+#   --with-intl=none    drop ICU (hundreds of sources)
+#   --without-snapshot  drop the host-arch V8 build + mksnapshot run
+#   --without-npm/corepack  drop CLI packaging
 CONFIGURE_ARGS="--dest-cpu=arm64 \
   --dest-os=openharmony \
   --cross-compiling \
   --shared \
+  --with-intl=none \
+  --without-snapshot \
+  --without-npm \
+  --without-corepack \
   --openssl-no-asm \
   --prefix=$workdir/node-${version}-openharmony-arm64"
 
@@ -114,8 +124,6 @@ fi
 echo "libnode.so size: $(stat -c %s node-${version}-openharmony-arm64/lib/libnode.so) bytes"
 
 tar -zcf node-${version}-openharmony-arm64.tar.gz node-${version}-openharmony-arm64
-tar -Jcf node-${version}-openharmony-arm64.tar.xz node-${version}-openharmony-arm64
-
 # slim artifact: dereference symlinks so it survives Windows extraction
 rm -rf out
 mkdir -p out

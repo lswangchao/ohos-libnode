@@ -1,0 +1,13 @@
+diff --git a/common_node.gypi b/common_node.gypi
+index 0bfbf728..ddc851b5 100644
+--- a/common_node.gypi
++++ b/common_node.gypi
+@@ -2,7 +2,7 @@
+   'target_defaults': {
+     'conditions': [
+       # Override common.gypi config to use C++20 for Node.js core only.
+-      ['OS in "linux freebsd openbsd solaris android aix os400 cloudabi"', {
++      ['OS in "linux openharmony freebsd openbsd solaris android aix os400 cloudabi"', {
+         'cflags_cc!': ['-std=gnu++17'],
+         'cflags_cc': ['-std=gnu++20'],
+       }],

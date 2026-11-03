@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Node.js tag to build'
+        required: true
+        default: 'v24.2.0'
+  push:
+    branches: [ "main" ]
+
+permissions: write-all
+
+jobs:
+  build-libnode:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve version
+        run: |
+          V="${{ github.event.inputs.version }}"
+          if [ -z "$V" ]; then V="v24.2.0"; fi
+          echo "VERSION=$V" >> $GITHUB_ENV
+          echo "will build Node.js $V"
+
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y build-essential unzip jq
+
+      - name: Build
+        run: bash build.sh ${{ env.VERSION }}
+
+      - name: Show artifacts
+        run: |
+          echo "--- output dir ---"
+          ls -lh libnode-ohos-arm64.tar.gz
+          tar -tzf libnode-ohos-arm64.tar.gz | head -20
+          tar -tzf libnode-ohos-arm64.tar.gz | wc -l
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libnode-ohos-arm64
+          path: libnode-ohos-arm64.tar.gz
+          retention-days: 7

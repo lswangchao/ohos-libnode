@@ -1,0 +1,9 @@
+*.tar.gz
+node-*-openharmony-arm64
+ohos-sdk
+daily_build.log
+manifest_tag.xml
+llvm-19
+node
+*.swp
+.dist-out/

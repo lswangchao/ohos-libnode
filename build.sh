@@ -78,7 +78,7 @@ fi
 CONFIGURE_ARGS="--dest-cpu=arm64 \
   --dest-os=openharmony \
   --cross-compiling \
-  --enable-shared \
+  --shared \
   --openssl-no-asm \
   --prefix=$workdir/node-${version}-openharmony-arm64"
 

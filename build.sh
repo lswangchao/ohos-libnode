@@ -57,23 +57,16 @@ export CXX="$workdir/llvm-19/llvm/bin/aarch64-unknown-linux-ohos-clang++ -fno-em
 export CC_host="gcc"
 export CXX_host="g++"
 
-need_patch_0001_versions="v24.2.0 v24.3.0 v24.4.0 v24.4.1 v24.5.0 v24.6.0"
-if echo " $need_patch_0001_versions " | grep -q " $version "; then
-    patch -p1 < ../0001-fix-argument-list-too-long.patch
-fi
+patch -p1 < ../0001-fix-argument-list-too-long.patch \
+  || echo "patch 0001 did not apply (may not be needed for $version)"
 
 need_patch_0002_versions="^v22\."
 if echo "$version" | grep -q "$need_patch_0002_versions"; then
     patch -p1 < ../0002-use-C++20-for-Node.js-core.patch
 fi
 
-need_no_error_versions="v24.2.0 v24.3.0 v24.4.0 v24.4.1 v24.5.0 \
-                        v24.6.0 v24.7.0 v24.8.0 v22.17.0 v22.17.1 \
-                        v22.18.0 v22.19.0"
-if echo " $need_no_error_versions " | grep -q " $version "; then
-    export CC="$CC -Wno-error=implicit-function-declaration"
-    export CXX="$CXX -Wno-error=implicit-function-declaration"
-fi
+export CC="$CC -Wno-error=implicit-function-declaration"
+export CXX="$CXX -Wno-error=implicit-function-declaration"
 
 # Compile budget: the free GitHub runner has only 4 cores and a hard job
 # timeout, and --shared forces -fPIC across all of V8/ICU. Trim everything
@@ -102,8 +95,25 @@ if ./configure --help 2>&1 | grep -q -- "--v8-disable-temporal-support"; then
     CONFIGURE_ARGS="$CONFIGURE_ARGS --v8-disable-temporal-support"
 fi
 
+# V8's largest translation units take minutes each at -O3 and -fPIC (forced by
+# --shared) makes it worse; -O1 roughly halves total compile time and is plenty
+# for an embedded I/O-bound JS server.
+sed -i "s/'-O3'/'-O1'/g" common.gypi node.gyp
+find tools/v8_gypfiles -maxdepth 1 \( -name '*.gyp' -o -name '*.gypi' \) \
+  -exec sed -i "s/'-O3'/'-O1'/g" {} + 2>/dev/null || true
+echo "remaining -O3 flags: $(grep -rl "'-O3'" common.gypi node.gyp tools/v8_gypfiles 2>/dev/null | wc -l)"
+
 ./configure $CONFIGURE_ARGS
-make -j$(nproc)
+
+# Keep the Actions log tiny (only per-target lines) so it can be fetched
+# quickly if the job is killed by the timeout; full output goes to /tmp.
+set -o pipefail
+if ! make -j6 2>&1 | tee /tmp/make_full.log | grep --line-buffered -E "CXX\(target\)|CC\(target\)|LINK\(target\)|SOLINK|error:|Error [0-9]|ninja: build stopped|Killed"; then
+    echo "=== make FAILED, last 250 lines of full log ==="
+    tail -250 /tmp/make_full.log
+    exit 1
+fi
+echo "compile targets done: $(grep -c 'CXX(target)' /tmp/make_full.log)"
 make install
 cd ..
 

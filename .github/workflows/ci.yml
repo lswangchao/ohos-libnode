@@ -7,8 +7,6 @@ on:
         description: 'Node.js tag to build'
         required: true
         default: 'v24.2.0'
-  push:
-    branches: [ "main" ]
 
 permissions: write-all
 

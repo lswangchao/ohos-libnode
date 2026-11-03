@@ -49,6 +49,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view "ohos-libnode" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
-            gh release create "ohos-libnode" --repo "$GITHUB_REPOSITORY" --title "libnode.so for OpenHarmony" --notes "auto build"
-          gh release upload "ohos-libnode" "libnode-ohos-arm64.tar.gz" --repo "$GITHUB_REPOSITORY" --clobber
+          TAG="ohos-libnode-${VERSION}"
+          ASSET="libnode-${VERSION}-ohos-arm64.tar.gz"
+          cp libnode-ohos-arm64.tar.gz "$ASSET"
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "libnode.so $VERSION (OpenHarmony arm64)" --notes "auto build"
+          gh release upload "$TAG" "$ASSET" --repo "$GITHUB_REPOSITORY" --clobber

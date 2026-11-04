@@ -118,13 +118,17 @@ fi
 # progress every 2 minutes, so the position of the build is always visible in
 # the Actions log even if the job gets killed by the timeout.
 rm -f /tmp/make_full.log
-make -j6 > /tmp/make_full.log 2>&1 &
+JOBS=${MAKE_JOBS:-$(nproc)}
+echo "make -j$JOBS on $(nproc) cores, $(free -m | awk '/Mem:/{print $7}') MB RAM available"
+make -j$JOBS > /tmp/make_full.log 2>&1 &
 MAKE_PID=$!
 while kill -0 $MAKE_PID 2>/dev/null; do
     sleep 120
-    DONE_N=$(grep -cE '(CXX|CC|LINK|SOLINK|ACTION)\(target\)' /tmp/make_full.log 2>/dev/null) || DONE_N=0
-    LAST=$(grep -E '(CXX|CC)\(target\)' /tmp/make_full.log 2>/dev/null | tail -1 | sed 's/^ *//' | cut -c1-90)
-    echo "[heartbeat] targets=$DONE_N last=$LAST"
+    DONE_N=$(grep -cE '(CXX|CC|LINK|SOLINK|ACTION)\((target|host)\)' /tmp/make_full.log 2>/dev/null) || DONE_N=0
+    TGT_N=$(grep -cE '(CXX|CC|LINK|SOLINK|ACTION)\(target\)' /tmp/make_full.log 2>/dev/null) || TGT_N=0
+    LAST=$(grep -E '(CXX|CC)\((target|host)\)' /tmp/make_full.log 2>/dev/null | tail -1 | sed 's/^ *//' | cut -c1-80)
+    MEM=$(free -m | awk '/Mem:/{print $7}')
+    echo "[heartbeat] all=$DONE_N target=$TGT_N mem=${MEM}MB last=$LAST"
 done
 RC=0
 wait $MAKE_PID || RC=$?

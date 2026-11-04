@@ -1,0 +1,32 @@
+name: Probe
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Machine info
+        run: |
+          echo "nproc: $(nproc)"
+          echo "mem: $(free -m | awk '/Mem:/{print $2" MB total, "$7" MB available"}')"
+          grep -m1 'model name' /proc/cpuinfo
+          echo "disk:"; df -h / | tail -1
+          echo "--- 4-core benchmark: compile 4 copies of a heavy C++ TU ---"
+          cat > /tmp/bench.cpp <<'EOF'
+          #include <vector>
+          #include <string>
+          #include <map>
+          #include <algorithm>
+          template<int N> struct F { static constexpr int v = F<N-1>::v + F<N-2>::v; };
+          template<> struct F<0> { static constexpr int v = 0; };
+          template<> struct F<1> { static constexpr int v = 1; };
+          int main() {
+            std::vector<std::map<std::string, std::vector<int>>> v(1000);
+            for (int i = 0; i < 1000; i++) v[i]["k" + std::to_string(i)].push_back(F<40>::v);
+            long s = 0; for (auto &m : v) for (auto &p : m) s += p.second.size();
+            return (int)(s & 1);
+          }
+          EOF
+          time (for i in 1 2 3 4; do g++ -O2 -c /tmp/bench.cpp -o /tmp/b$i.o & done; wait)

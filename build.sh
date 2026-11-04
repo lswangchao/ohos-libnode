@@ -103,17 +103,38 @@ find tools/v8_gypfiles -maxdepth 1 \( -name '*.gyp' -o -name '*.gypi' \) \
   -exec sed -i "s/'-O3'/'-O1'/g" {} + 2>/dev/null || true
 echo "remaining -O3 flags: $(grep -rl "'-O3'" common.gypi node.gyp tools/v8_gypfiles 2>/dev/null | wc -l)"
 
+# Resume support: a previous (timed-out) attempt may have left a partial
+# out/ dir; make can pick up where it stopped as long as sources are identical
+# (same tag + same patches -> deterministic tree).
+if [ -d "$workdir/out-cache" ] && [ -n "$(ls -A "$workdir/out-cache" 2>/dev/null)" ]; then
+    echo "restoring partial build dir from out-cache ($(du -sh "$workdir/out-cache" | cut -f1))"
+    mkdir -p out
+    cp -a "$workdir/out-cache/." out/
+fi
+
 ./configure $CONFIGURE_ARGS
 
-# Keep the Actions log tiny (only per-target lines) so it can be fetched
-# quickly if the job is killed by the timeout; full output goes to /tmp.
-set -o pipefail
-if ! make -j6 2>&1 | tee /tmp/make_full.log | grep --line-buffered -E "CXX\(target\)|CC\(target\)|LINK\(target\)|SOLINK|error:|Error [0-9]|ninja: build stopped|Killed"; then
+# Run make with full output captured to a file and print a heartbeat with live
+# progress every 2 minutes, so the position of the build is always visible in
+# the Actions log even if the job gets killed by the timeout.
+rm -f /tmp/make_full.log
+make -j6 > /tmp/make_full.log 2>&1 &
+MAKE_PID=$!
+while kill -0 $MAKE_PID 2>/dev/null; do
+    sleep 120
+    DONE_N=$(grep -cE '(CXX|CC|LINK|SOLINK|ACTION)\(target\)' /tmp/make_full.log 2>/dev/null) || DONE_N=0
+    LAST=$(grep -E '(CXX|CC)\(target\)' /tmp/make_full.log 2>/dev/null | tail -1 | sed 's/^ *//' | cut -c1-90)
+    echo "[heartbeat] targets=$DONE_N last=$LAST"
+done
+RC=0
+wait $MAKE_PID || RC=$?
+TOTAL=$(grep -cE '(CXX|CC|LINK|SOLINK|ACTION)\(target\)' /tmp/make_full.log 2>/dev/null) || TOTAL=0
+echo "make exit code: $RC, compiled targets: $TOTAL"
+if [ $RC -ne 0 ]; then
     echo "=== make FAILED, last 250 lines of full log ==="
     tail -250 /tmp/make_full.log
     exit 1
 fi
-echo "compile targets done: $(grep -c 'CXX(target)' /tmp/make_full.log)"
 make install
 cd ..
 

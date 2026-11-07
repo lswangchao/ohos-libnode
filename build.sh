@@ -152,6 +152,7 @@ cp LICENSE node-${version}-openharmony-arm64
 
 # verify shared library was produced
 ls -l node-${version}-openharmony-arm64/lib/ || true
+ln -sf libnode.so.137 node-${version}-openharmony-arm64/lib/libnode.so
 if [ ! -f node-${version}-openharmony-arm64/lib/libnode.so ]; then
     echo "ERROR: libnode.so not found"
     exit 1
